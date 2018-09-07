@@ -60,12 +60,12 @@ void check_char(WORD** cursor, char digit, int* cont){
 
 }
 
-void read_file(WORD** cursor){
+void read_file(WORD** cursor, char archive[]){
     FILE* fd;
     char letter;
     int cont = 0;
 
-    fd = fopen("texto.txt", "rt");
+    fd = fopen(archive, "rt");
 
     while(!feof(fd)){
         letter=getc(fd);
@@ -231,9 +231,9 @@ void insert_after(WORD** cursor){
     }
 }
 
-void insert_file(WORD* cursor){
+void insert_file(WORD* cursor, char archive[]){
     FILE* fd;
-    fd = fopen("texto.txt", "wt");
+    fd = fopen(archive, "wt");
     int cont = 0;
 
     while(cursor!=NULL){
@@ -321,13 +321,19 @@ void menu(WORD** cursor){
 
 int main(int argc, char const *argv[]){
     WORD* cursor;
+    char archive[6];
 
     cursor=insert();
+
+    scanf("%c", &archive[0]);
+    getchar();
+    archive[5]='\0';
+    printf("%s\n", archive);
     
-    read_file(&cursor);
+    read_file(&cursor, archive);
     menu(&cursor);
     begin(&cursor);
-    insert_file(cursor);
+    insert_file(cursor, archive);
     free_all(&cursor);
 
     return 0;
