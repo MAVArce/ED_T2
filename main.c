@@ -22,6 +22,8 @@ WORD* insert(){
 int check(char digit){
     if((digit>='A' && digit <='Z') || (digit>='a' && digit<='z') || (digit>='0' && digit <='9')){
         return 1;
+    }else if(digit=='\n'){
+        return 2;
     }else{
         return 0;
     }
@@ -34,30 +36,46 @@ void end_str(char a[]){
     a[aux]='\0';
 }
 
+void previous(WORD** cursor){
+    if((*cursor)->prev!=NULL)
+        *cursor=(*cursor)->prev;
+}
+
+void next(WORD** cursor){
+    if((*cursor)->next!=NULL)
+        *cursor=(*cursor)->next;
+}
+
+void end(WORD** cursor){
+    while((*cursor)->next!=NULL)
+    next(cursor);
+}
+
+void begin(WORD** cursor){
+    while((*cursor)->prev!=NULL)
+        previous(cursor);
+}
+
 void check_char(WORD** cursor, char digit, int* cont){
     WORD* aux;
 
-    if((digit>='A' && digit <='Z') || (digit>='a' && digit<='z') || (digit>='0' && digit <='9')){
+    if(check(digit)==1 && (*cont==0 || (*cont!=0 && check((*cursor)->word[(*cont)-1])==1))){
         (*cursor)->word[*cont]=digit;
         (*cont)++;
-    }else if(digit==' '){
-        (*cursor)->word[*cont]='\0';
-        (*cursor)->next=insert();
-        aux=*cursor;
-        *cursor=(*cursor)->next;
-        (*cursor)->prev=aux;
-        *cont=0;
-    }else{
-        (*cursor)->word[*cont]='\0';
-        (*cursor)->next=insert();
-        aux=*cursor;
-        *cursor=(*cursor)->next;
-        (*cursor)->prev=aux;
-        *cont=0;
-        (*cursor)->word[*cont]=digit;
-        (*cont)++;        
+        return;
     }
 
+    (*cursor)->word[*cont]='\0';
+    (*cursor)->next=insert();
+    aux=*cursor;
+    *cursor=(*cursor)->next;
+    (*cursor)->prev=aux;
+    *cont=0;
+
+    if(digit!=' '){
+        (*cursor)->word[*cont]=digit;
+        (*cont)++; 
+    }
 }
 
 void read_file(WORD** cursor, char archive[]){
@@ -76,26 +94,6 @@ void read_file(WORD** cursor, char archive[]){
     (*cursor)->next=NULL;
 
     fclose(fd);
-}
-
-void previous(WORD** cursor){
-    if((*cursor)->prev!=NULL)
-        *cursor=(*cursor)->prev;
-}
-
-void next(WORD** cursor){
-    if((*cursor)->next!=NULL)
-        *cursor=(*cursor)->next;
-}
-
-void begin(WORD** cursor){
-    while((*cursor)->prev!=NULL)
-        previous(cursor);
-}
-
-void end(WORD** cursor){
-    while((*cursor)->next!=NULL)
-    next(cursor);
 }
 
 void move(WORD** cursor){
@@ -125,17 +123,20 @@ void find_word(WORD* cursor){
     fgets(text, 30, stdin);
     end_str(text);
 
+    if(strcmp(text, "<ENTER>")==0)
+        strcpy(text, "\n\0");
+
     for(aux=cursor; aux->prev!=NULL; aux=aux->prev)
         cont++;
     
     aux=cursor;
     
     while(strcmp(aux->word, text)!=0){
-        if(aux!=NULL){
-            aux=aux->next;
-            cont++;
-        }else{
+        aux=aux->next;
+        cont++;
+        if(aux==NULL){
             check=1;
+            break;
         }
     }
 
@@ -145,13 +146,21 @@ void find_word(WORD* cursor){
 
 void print(WORD* cursor){
     int cont = 0;
+    WORD* atual = cursor;
+
+
+    begin(&cursor);
 
     while(cursor!=NULL){
         if(cursor->word[cont]!='\0'){
+            if(cursor == atual)
+                printf("|");
             printf("%c", cursor->word[cont]);
+            if(cursor == atual)
+                printf("|");
             cont++;
         }else{
-            if((cursor->next)!=NULL && check((cursor->next)->word[0])==1){
+            if((cursor->next)!=NULL && cursor->word[0]!='\n' && check((cursor->next)->word[0])==1){
                 printf(" ");
             }
             cont = 0;
@@ -172,6 +181,7 @@ void remove_node(WORD** cursor){
         aux=*cursor;
         *cursor=(*cursor)->next;
         (*cursor)->prev=aux->prev;
+        aux->prev->next=*cursor;
         free(aux);
     }
 }
@@ -180,7 +190,9 @@ void replace(WORD** cursor){
     char text[30];
     
     fgets(text, 30, stdin);
-    end_str(text);    
+    end_str(text);
+    if(strcmp(text, "<ENTER>")==0)
+        strcpy(text, "\n\0");
     
     strcpy((*cursor)->word, text);
 }
@@ -191,8 +203,10 @@ void insert_before(WORD** cursor){
 
     fgets(text, 30, stdin);
     end_str(text);
-    
 
+    if(strcmp(text, "<ENTER>")==0)
+        strcpy(text, "\n\0");
+    
     aux=insert();
     strcpy(aux->word, text);
 
@@ -212,9 +226,11 @@ void insert_after(WORD** cursor){
     WORD* aux;
     char text[30];
 
-    
     fgets(text, 30, stdin);
     end_str(text);    
+
+    if(strcmp(text, "<ENTER>")==0)
+        strcpy(text, "\n\0");
     
     aux=insert();
     strcpy(aux->word, text);
@@ -231,7 +247,7 @@ void insert_after(WORD** cursor){
     }
 }
 
-void insert_file(WORD* cursor, char archive[]){
+void write_file(WORD* cursor, char archive[]){
     FILE* fd;
     fd = fopen(archive, "wt");
     int cont = 0;
@@ -241,7 +257,7 @@ void insert_file(WORD* cursor, char archive[]){
             fprintf(fd, "%c", cursor->word[cont]);
             cont++;
         }else{
-            if((cursor->next)!=NULL && check((cursor->next)->word[0])==1){
+            if((cursor->next)!=NULL && cursor->word[0]!='\n' && check((cursor->next)->word[0])==1){
                 fprintf(fd, " ");
             }
             cont = 0;
@@ -267,6 +283,7 @@ void menu(WORD** cursor){
 
     begin(cursor);
     while(t){
+        print(*cursor);
         mode=getchar();
         getchar();
         switch(mode){
@@ -325,15 +342,15 @@ int main(int argc, char const *argv[]){
 
     cursor=insert();
 
-    scanf("%c", &archive[0]);
+    archive[0]=getchar();
     getchar();
-    archive[5]='\0';
-    printf("%s\n", archive);
+    archive[1]='\0';
+    strcat(archive, ".ext\0");
     
     read_file(&cursor, archive);
     menu(&cursor);
     begin(&cursor);
-    insert_file(cursor, archive);
+    write_file(cursor, archive);
     free_all(&cursor);
 
     return 0;
