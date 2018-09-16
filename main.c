@@ -2,17 +2,42 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define COMMON 1
+#define SPECIAL 0
+#define ENTER 2
+
+struct character{
+    char letter;
+    struct character* next;
+    struct character* prev;
+};
+
+typedef struct character CHARACTER;
+
 struct node{
-    char word[30];
+    CHARACTER* first;
     struct node* next;
     struct node* prev;
 };
 
 typedef struct node WORD;
 
-WORD* insert(){
+CHARACTER* insert_character(char a){
+    CHARACTER* new;
+    
+    new=(CHARACTER*) malloc(sizeof(CHARACTER));
+    new->letter=a;
+    new->next=NULL;
+    new->prev=NULL;
+
+    return new;
+}
+
+WORD* insert_word(){
     WORD* new;
+
     new = (WORD*) malloc(sizeof(WORD));
+    new->first=NULL;
     new->prev=NULL;
     new->next=NULL;
 
@@ -21,11 +46,11 @@ WORD* insert(){
 
 int check(char digit){
     if((digit>='A' && digit <='Z') || (digit>='a' && digit<='z') || (digit>='0' && digit <='9')){
-        return 1;
+        return COMMON;
     }else if(digit=='\n'){
-        return 2;
+        return ENTER;
     }else{
-        return 0;
+        return SPECIAL;
     }
 }
 
@@ -48,7 +73,7 @@ void next(WORD** cursor){
 
 void end(WORD** cursor){
     while((*cursor)->next!=NULL)
-    next(cursor);
+        next(cursor);
 }
 
 void begin(WORD** cursor){
@@ -56,39 +81,47 @@ void begin(WORD** cursor){
         previous(cursor);
 }
 
-void check_char(WORD** cursor, char digit, int* cont){
-    WORD* aux;
+void check_char(WORD** cursor, char digit){
+    WORD* pntr_w;
+    CHARACTER* new_c = NULL;
+    CHARACTER* pntr_c = NULL;
 
-    if(check(digit)==1 && (*cont==0 || (*cont!=0 && check((*cursor)->word[(*cont)-1])==1))){
-        (*cursor)->word[*cont]=digit;
-        (*cont)++;
+    if(digit!=' ')
+        new_c=insert_character(digit);
+
+    if((*cursor)->first!=NULL){
+        for(pntr_c=(*cursor)->first; pntr_c->next!=NULL; pntr_c=pntr_c->next);
+    }else{
+        (*cursor)->first=new_c;
+        return;
+    }
+    
+    if(check(digit)==COMMON && check(pntr_c->letter)==COMMON){
+        pntr_c->next=new_c;
         return;
     }
 
-    (*cursor)->word[*cont]='\0';
-    (*cursor)->next=insert();
-    aux=*cursor;
+    (*cursor)->next=insert_word();
+    pntr_w=*cursor;
     *cursor=(*cursor)->next;
-    (*cursor)->prev=aux;
-    *cont=0;
+    (*cursor)->prev=pntr_w;
 
     if(digit!=' '){
-        (*cursor)->word[*cont]=digit;
-        (*cont)++; 
+        (*cursor)->first=new_c;
     }
 }
 
 void read_file(WORD** cursor, char archive[]){
     FILE* fd;
     char letter;
-    int cont = 0;
 
     fd = fopen(archive, "rt");
 
     while(!feof(fd)){
         letter=getc(fd);
-        check_char(cursor, letter, &cont);
+        check_char(cursor, letter);
     }
+    
     *cursor=(*cursor)->prev;
     free((*cursor)->next);
     (*cursor)->next=NULL;
@@ -115,74 +148,103 @@ void move(WORD** cursor){
 }
 
 void find_word(WORD* cursor){
-    WORD* aux;
+    CHARACTER* pntr_c;
+    WORD* pntr_w;
+    char text[30];
     int cont = 0;
     int check = 0;
-    char text[30];
+    int aux;
     
     fgets(text, 30, stdin);
     end_str(text);
-
     if(strcmp(text, "<ENTER>")==0)
         strcpy(text, "\n\0");
 
-    for(aux=cursor; aux->prev!=NULL; aux=aux->prev)
+    for(pntr_w=cursor; pntr_w->prev!=NULL; pntr_w=pntr_w->prev)
         cont++;
     
-    aux=cursor;
-    
-    while(strcmp(aux->word, text)!=0){
-        aux=aux->next;
-        cont++;
-        if(aux==NULL){
-            check=1;
+    for(pntr_w=cursor; pntr_w!=NULL; pntr_w=pntr_w->next){
+        for(aux=0, pntr_c=pntr_w->first; text[aux]!='\0' && pntr_c!=NULL; aux++, pntr_c=pntr_c->next){
+            if(text[aux]!=pntr_c->letter)
+                break;
+        }
+        if(text[aux]=='\0' && pntr_c==NULL){
+            check = 1;
             break;
         }
+        cont++;
     }
 
-    if(check==0)
+    if(check==1)
         printf("%d\n", cont);
 }
 
 void print(WORD* cursor){
-    int cont = 0;
-    WORD* atual = cursor;
+    CHARACTER* aux_c;
 
-
-    begin(&cursor);
+    aux_c=cursor->first;
 
     while(cursor!=NULL){
-        if(cursor->word[cont]!='\0'){
-            if(cursor == atual)
-                printf("|");
-            printf("%c", cursor->word[cont]);
-            if(cursor == atual)
-                printf("|");
-            cont++;
+        if(aux_c!=NULL){
+            printf("%c", aux_c->letter);
+            aux_c=aux_c->next;
         }else{
-            if((cursor->next)!=NULL && cursor->word[0]!='\n' && check((cursor->next)->word[0])==1){
+            if((cursor->next)!=NULL && cursor->first->letter!='\n' && check((cursor->next)->first->letter)==COMMON){
                 printf(" ");
             }
-            cont = 0;
             cursor=cursor->next;
+            if(cursor!=NULL)
+                aux_c=cursor->first;
         }
     }
     printf("\n"); //
 }
 
+void write_word(WORD** pntr_w, char text[]){
+    CHARACTER* pntr_c;
+    int aux;
+
+    (*pntr_w)->first=insert_character(text[0]);
+    pntr_c=(*pntr_w)->first;
+
+    for(aux=1; text[aux]!='\0'; aux++){
+        pntr_c->next=insert_character(text[aux]);
+        pntr_c->next->prev=pntr_c;
+        pntr_c=pntr_c->next;
+    }
+}
+
+void free_word(WORD** cursor){
+    CHARACTER* pntr_c;
+    CHARACTER* aux;
+
+    pntr_c=(*cursor)->first;
+
+    while(pntr_c->next!=NULL){
+        aux=pntr_c;
+        pntr_c=pntr_c->next;
+        free(aux);
+    }
+    free(pntr_c);
+
+    (*cursor)->first=NULL;
+}
+
 void remove_node(WORD** cursor){
-    WORD* aux;
+    WORD* pntr;
+
+    free_word(cursor);
     
     if((*cursor)->next==NULL){
         *cursor=(*cursor)->prev;
         free((*cursor)->next);
         (*cursor)->next=NULL;
     }else{
-        aux=*cursor;
+        pntr=*cursor;
         *cursor=(*cursor)->next;
-        (*cursor)->prev=aux->prev;
-        aux->prev->next=*cursor;
-        free(aux);
+        (*cursor)->prev=pntr->prev;
+        pntr->prev->next=*cursor;
+        free(pntr);
     }
 }
 
@@ -193,12 +255,13 @@ void replace(WORD** cursor){
     end_str(text);
     if(strcmp(text, "<ENTER>")==0)
         strcpy(text, "\n\0");
-    
-    strcpy((*cursor)->word, text);
+
+    free_word(cursor);
+    write_word(cursor, text);    
 }
 
 void insert_before(WORD** cursor){
-    WORD* aux;
+    WORD* pntr_w;
     char text[30];
 
     fgets(text, 30, stdin);
@@ -207,23 +270,23 @@ void insert_before(WORD** cursor){
     if(strcmp(text, "<ENTER>")==0)
         strcpy(text, "\n\0");
     
-    aux=insert();
-    strcpy(aux->word, text);
+    pntr_w=insert_word();
+    write_word(&pntr_w, text);
 
     if((*cursor)->prev==NULL){
-        (*cursor)->prev=aux;
-        aux->next=*cursor;
-        aux->prev=NULL;    
+        (*cursor)->prev=pntr_w;
+        pntr_w->next=*cursor;
+        pntr_w->prev=NULL;    
     }else{
-        aux->prev=(*cursor)->prev;
-        aux->next=*cursor;
-        ((*cursor)->prev)->next=aux;
-        (*cursor)->prev=aux;
+        pntr_w->prev=(*cursor)->prev;
+        pntr_w->next=*cursor;
+        ((*cursor)->prev)->next=pntr_w;
+        (*cursor)->prev=pntr_w;
     }
 }
 
 void insert_after(WORD** cursor){
-    WORD* aux;
+    WORD* pntr_w;
     char text[30];
 
     fgets(text, 30, stdin);
@@ -232,39 +295,19 @@ void insert_after(WORD** cursor){
     if(strcmp(text, "<ENTER>")==0)
         strcpy(text, "\n\0");
     
-    aux=insert();
-    strcpy(aux->word, text);
+    pntr_w=insert_word();
+    write_word(&pntr_w, text);
 
     if((*cursor)->next==NULL){
-        (*cursor)->next=aux;
-        aux->prev=*cursor;
-        aux->next=NULL;
+        (*cursor)->next=pntr_w;
+        pntr_w->prev=*cursor;
+        pntr_w->next=NULL;
     }else{
-        aux->prev=*cursor;
-        aux->next=(*cursor)->next;
-        (*cursor)->next->prev=aux;
-        (*cursor)->next=aux;
+        pntr_w->prev=*cursor;
+        pntr_w->next=(*cursor)->next;
+        (*cursor)->next->prev=pntr_w;
+        (*cursor)->next=pntr_w;
     }
-}
-
-void write_file(WORD* cursor, char archive[]){
-    FILE* fd;
-    fd = fopen(archive, "wt");
-    int cont = 0;
-
-    while(cursor!=NULL){
-        if(cursor->word[cont]!='\0'){
-            fprintf(fd, "%c", cursor->word[cont]);
-            cont++;
-        }else{
-            if((cursor->next)!=NULL && cursor->word[0]!='\n' && check((cursor->next)->word[0])==1){
-                fprintf(fd, " ");
-            }
-            cont = 0;
-            cursor=cursor->next;
-        }
-    }
-    fclose(fd);
 }
 
 void free_all(WORD** cursor){
@@ -273,6 +316,7 @@ void free_all(WORD** cursor){
     while(*cursor!=NULL){
         aux=*cursor;
         *cursor=(*cursor)->next;
+        free_word(&aux);
         free(aux);
     }
 }
@@ -283,7 +327,7 @@ void menu(WORD** cursor){
 
     begin(cursor);
     while(t){
-        print(*cursor);
+        //print(*cursor);
         mode=getchar();
         getchar();
         switch(mode){
@@ -340,17 +384,16 @@ int main(int argc, char const *argv[]){
     WORD* cursor;
     char archive[6];
 
-    cursor=insert();
+    cursor=insert_word();
 
     archive[0]=getchar();
-    getchar();
+    while(getchar()!='\n');
     archive[1]='\0';
     strcat(archive, ".ext\0");
     
     read_file(&cursor, archive);
     menu(&cursor);
     begin(&cursor);
-    write_file(cursor, archive);
     free_all(&cursor);
 
     return 0;
